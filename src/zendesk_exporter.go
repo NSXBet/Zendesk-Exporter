@@ -1,19 +1,21 @@
 package main
 
 import (
-	"Zendesk-Exporter/src/config"
-	"Zendesk-Exporter/src/zendesk"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/NSXBet/Zendesk-Exporter/src/config"
+	"github.com/NSXBet/Zendesk-Exporter/src/zendesk"
+
+	kingpin "github.com/alecthomas/kingpin/v2"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	promlog "github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (
@@ -21,7 +23,7 @@ var (
 		C: &config.Config{},
 	}
 
-	log promlog.Logger
+	logger log.Logger
 
 	configFile    = kingpin.Flag("config.file", "Compteur configuration file.").Default("zendesk.yml").String()
 	listenAddress = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests.").Default(":9146").String()
@@ -29,6 +31,7 @@ var (
 )
 
 func init() {
+	prometheus.MustRegister(prometheus.NewBuildInfoCollector())
 	prometheus.MustRegister(version.NewCollector("zendesk_exporter"))
 }
 
@@ -51,18 +54,31 @@ func zendeskHandler(w http.ResponseWriter, r *http.Request, z *zendesk.Client, f
 func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
-	log = promlog.Base()
-	if err := log.SetLevel(*logLevel); err != nil {
-		log.Fatal("Error: ", err)
+	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
+	logger = level.NewFilter(logger, level.AllowInfo())
+	if *logLevel != "" {
+		switch *logLevel {
+		case "debug":
+			logger = level.NewFilter(logger, level.AllowDebug())
+		case "info":
+			logger = level.NewFilter(logger, level.AllowInfo())
+		case "warn":
+			logger = level.NewFilter(logger, level.AllowWarn())
+		case "error":
+			logger = level.NewFilter(logger, level.AllowError())
+		default:
+			fmt.Printf("Unrecognized log level: %v\n", *logLevel)
+			os.Exit(1)
+		}
 	}
 
-	log.Infoln("Starting Zendesk-Exporter")
+	level.Info(logger).Log("msg", "Starting Zendesk-Exporter")
 
 	if err := sc.ReloadConfig(*configFile); err != nil {
-		log.Fatal("Error loading config: ", err)
+		level.Error(logger).Log("msg", "Error loading config", "err", err)
 		os.Exit(1)
 	}
-	log.Infoln("Loaded config file")
+	level.Info(logger).Log("msg", "Loaded config file")
 	sc.Lock()
 	conf := sc.C
 	sc.Unlock()
@@ -76,16 +92,16 @@ func main() {
 			select {
 			case <-hup:
 				if err := sc.ReloadConfig(*configFile); err != nil {
-					log.Errorln("Error reloading config:", err)
+					level.Error(logger).Log("msg", "Error reloading config", "err", err)
 					continue
 				}
-				log.Infoln("Reloaded config file")
+				level.Info(logger).Log("msg", "Reloaded config file")
 			case rc := <-reloadCh:
 				if err := sc.ReloadConfig(*configFile); err != nil {
-					log.Errorln("Error reloading config:", err)
+					level.Error(logger).Log("msg", "Error reloading config", "err", err)
 					rc <- err
 				} else {
-					log.Infoln("Reloaded config file")
+					level.Info(logger).Log("msg", "Reloaded config file")
 					rc <- nil
 				}
 			}
@@ -94,7 +110,8 @@ func main() {
 
 	zen, err := setZendeskClient(&conf.Zendesk)
 	if err != nil {
-		log.Fatalln(err)
+		level.Error(logger).Log("msg", "Error setting Zendesk client", "err", err)
+		os.Exit(1)
 	}
 
 	http.HandleFunc("/-/reload", func(w http.ResponseWriter, r *http.Request) {
@@ -140,9 +157,9 @@ func main() {
 			</html>`))
 	})
 
-	log.Infoln("Listening on:", *listenAddress)
+	level.Info(logger).Log("msg", "Listening on", "address", *listenAddress)
 	if err := http.ListenAndServe(*listenAddress, nil); err != nil {
-		log.Fatal("Error: Can't starting HTTP server: ", err)
+		level.Error(logger).Log("msg", "Error starting HTTP server", "err", err)
 		os.Exit(1)
 	}
 	m, err := zen.GetTicketStats()

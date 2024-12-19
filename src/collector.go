@@ -1,9 +1,10 @@
 package main
 
 import (
-	"Zendesk-Exporter/src/config"
-	"Zendesk-Exporter/src/zendesk"
+	"github.com/NSXBet/Zendesk-Exporter/src/config"
+	"github.com/NSXBet/Zendesk-Exporter/src/zendesk"
 
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -20,7 +21,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 
 	rt, err := c.zenClient.GetTicketStats()
 	if err != nil {
-		log.Errorln(err)
+		level.Error(logger).Log("msg", "Error fetching metrics", "err", err)
 		return
 	}
 
