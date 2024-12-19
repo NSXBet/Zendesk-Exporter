@@ -9,7 +9,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-//Config Represent the Yaml config of Zendesk-Exporter
+// Config Represent the Yaml config of Zendesk-Exporter
 type Config struct {
 	Zendesk Zendesk `yaml:"zendesk"`
 	Filter  Filter  `yaml:"filter"`
@@ -17,7 +17,7 @@ type Config struct {
 	XXX map[string]interface{} `yaml:",inline"`
 }
 
-//Zendesk Represent the credentials to connect to Zendesk
+// Zendesk Represent the credentials to connect to Zendesk
 type Zendesk struct {
 	URL      string `yaml:"url"`
 	Login    string `yaml:"login"`
@@ -27,17 +27,18 @@ type Zendesk struct {
 	XXX map[string]interface{} `yaml:",inline"`
 }
 
-//Filter Represent the filter use in this exporter
+// Filter Represent the filter use in this exporter
 type Filter struct {
 	Priority     bool         `yaml:"priority"`
 	Status       bool         `yaml:"status"`
 	Channel      bool         `yaml:"channel"`
+	MaxPages     int          `yaml:"max_pages"`
 	CustomFields CustomFields `yaml:"custom_fields"`
 
 	XXX map[string]interface{} `yaml:",inline"`
 }
 
-//CustomFields Represent the filter use in this exporter
+// CustomFields Represent the filter use in this exporter
 type CustomFields struct {
 	Enable bool     `yaml:"enable"`
 	Fields []string `yaml:"fields"`
@@ -56,7 +57,7 @@ func checkOverflow(m map[string]interface{}, ctx string) error {
 	return nil
 }
 
-//UnmarshalYAML Decoding yaml config file
+// UnmarshalYAML Decoding yaml config file
 func (s *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type plain Config
 	if err := unmarshal((*plain)(s)); err != nil {
@@ -68,7 +69,7 @@ func (s *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-//UnmarshalYAML Decoding yaml zendesk part
+// UnmarshalYAML Decoding yaml zendesk part
 func (s *Zendesk) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type plain Zendesk
 	if err := unmarshal((*plain)(s)); err != nil {
@@ -80,7 +81,7 @@ func (s *Zendesk) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-//UnmarshalYAML Decoding yaml filter part
+// UnmarshalYAML Decoding yaml filter part
 func (s *Filter) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type plain Filter
 	if err := unmarshal((*plain)(s)); err != nil {
@@ -92,7 +93,7 @@ func (s *Filter) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-//UnmarshalYAML Decoding yaml custom field part
+// UnmarshalYAML Decoding yaml custom field part
 func (s *CustomFields) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type plain CustomFields
 	if err := unmarshal((*plain)(s)); err != nil {
@@ -104,13 +105,13 @@ func (s *CustomFields) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-//SafeConfig Represent a config locked
+// SafeConfig Represent a config locked
 type SafeConfig struct {
 	sync.RWMutex
 	C *Config
 }
 
-//ReloadConfig Reload Config from new yaml file
+// ReloadConfig Reload Config from new yaml file
 func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 	var c = &Config{}
 

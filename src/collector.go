@@ -17,14 +17,16 @@ func (c collector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c collector) Collect(ch chan<- prometheus.Metric) {
-	logger.Debug().Msg("Starting metrics collection")
+	logger.Debug().Msg("Serving metrics from cache")
 
-	rt, err := c.zenClient.GetTicketStats()
-	if err != nil {
-		logger.Error().Err(err).Msg("Error fetching metrics")
+	triggerBackgroundUpdate(c.zenClient, c.filter)
+
+	cached := statsCache.Load()
+	if cached == nil {
+		logger.Error().Msg("No cached stats available")
 		return
 	}
-	logger.Debug().Interface("stats", rt).Msg("Retrieved ticket stats")
+	rt := cached.(*zendesk.ResultTicket)
 
 	ch <- prometheus.MustNewConstMetric(
 		prometheus.NewDesc("zendesk_ticket_count", "Tickets Number", nil, nil),
@@ -74,4 +76,19 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
+}
+
+func triggerBackgroundUpdate(client *zendesk.Client, filter *config.Filter) {
+	go func() {
+		cacheMutex.Lock()
+		defer cacheMutex.Unlock()
+
+		stats, err := client.GetTicketStats(filter.MaxPages)
+		if err != nil {
+			logger.Error().Err(err).Msg("Error updating ticket stats")
+			return
+		}
+		statsCache.Store(stats)
+		logger.Debug().Msg("Updated ticket stats cache")
+	}()
 }

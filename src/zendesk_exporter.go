@@ -5,7 +5,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
+	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/NSXBet/Zendesk-Exporter/src/config"
 	"github.com/NSXBet/Zendesk-Exporter/src/zendesk"
@@ -29,6 +32,8 @@ var (
 	configFile    = kingpin.Flag("config.file", "Compteur configuration file.").Default("zendesk.yml").String()
 	listenAddress = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests.").Default(":9146").String()
 	logLevel      = kingpin.Flag("log.level", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]").Default("info").String()
+	statsCache    atomic.Value // For thread-safe access to cached stats
+	cacheMutex    sync.Mutex
 )
 
 func init() {
@@ -53,6 +58,32 @@ func zendeskHandler(w http.ResponseWriter, r *http.Request, z *zendesk.Client, f
 	logger.Debug().Msg("Collector registered, serving metrics")
 	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 	h.ServeHTTP(w, r)
+}
+
+func updateStats(client *zendesk.Client, filter *config.Filter) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	updateCache := func() {
+		cacheMutex.Lock()
+		defer cacheMutex.Unlock()
+
+		stats, err := client.GetTicketStats(filter.MaxPages)
+		if err != nil {
+			logger.Error().Err(err).Msg("Error updating ticket stats")
+			return
+		}
+		statsCache.Store(stats)
+		logger.Debug().Msg("Updated ticket stats cache")
+	}
+
+	// Initial update
+	updateCache()
+
+	// Periodic updates
+	for range ticker.C {
+		updateCache()
+	}
 }
 
 func main() {
@@ -110,24 +141,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info().Msg("Testing Zendesk connection...")
-	logger.Debug().
-		Str("url", conf.Zendesk.URL).
-		Str("login", conf.Zendesk.Login).
-		Str("auth_type", map[bool]string{true: "token", false: "password"}[conf.Zendesk.Token != ""]).
-		Str("full_url", fmt.Sprintf("https://%s.zendesk.com/api/v2", conf.Zendesk.URL)).
-		Msg("Using credentials")
-
-	if _, err := zen.GetTicketStats(); err != nil {
-		logger.Error().
-			Err(err).
-			Str("url", conf.Zendesk.URL).
-			Str("login", conf.Zendesk.Login).
-			Str("request_url", fmt.Sprintf("https://%s.zendesk.com/api/v2/tickets.json", conf.Zendesk.URL)).
-			Msg("Failed to connect to Zendesk")
-		os.Exit(1)
-	}
-	logger.Info().Msg("Successfully connected to Zendesk")
+	// Start background stats updater
+	go updateStats(zen, &conf.Filter)
 
 	http.HandleFunc("/-/reload", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
@@ -177,7 +192,7 @@ func main() {
 		logger.Error().Err(err).Msg("Error starting HTTP server")
 		os.Exit(1)
 	}
-	m, err := zen.GetTicketStats()
+	m, err := zen.GetTicketStats(conf.Filter.MaxPages)
 	if err != nil {
 		fmt.Println(err)
 	} else {

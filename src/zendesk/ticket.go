@@ -61,14 +61,16 @@ type Tickets struct {
 	Count    int64    `json:"count"`
 }
 
-const MaxPages = 100
-
-func (c *Client) getTickets() ([]ticket, error) {
+func (c *Client) getTickets(maxPages int) ([]ticket, error) {
 	var tickets Tickets
 	var list []ticket
 
+	if maxPages <= 0 {
+		maxPages = 100 // Default if not set
+	}
+
 	i := 1
-	for i <= MaxPages {
+	for i <= maxPages {
 		body, err := c.Get("/tickets.json?page=" + strconv.Itoa(i))
 		if err != nil {
 			return []ticket{}, err
@@ -97,10 +99,10 @@ func (c *Client) getTickets() ([]ticket, error) {
 }
 
 // GetTicketStats Return statistics of all tickets in a map
-func (c *Client) GetTicketStats() (*ResultTicket, error) {
+func (c *Client) GetTicketStats(maxPages int) (*ResultTicket, error) {
 	rt := NewResultTicket()
 
-	list, err := c.getTickets()
+	list, err := c.getTickets(maxPages)
 	if err != nil {
 		return nil, err
 	}
