@@ -3,6 +3,7 @@ package zendesk
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 )
@@ -52,7 +53,7 @@ type ticket struct {
 	UpdatedAt           *time.Time  `json:"updated_at,omitempty"`
 }
 
-//Tickets Object get by api
+// Tickets Object get by api
 type Tickets struct {
 	List     []ticket `json:"tickets"`
 	Next     string   `json:"next_page"`
@@ -60,12 +61,14 @@ type Tickets struct {
 	Count    int64    `json:"count"`
 }
 
+const MaxPages = 100
+
 func (c *Client) getTickets() ([]ticket, error) {
 	var tickets Tickets
 	var list []ticket
 
 	i := 1
-	for {
+	for i <= MaxPages {
 		body, err := c.Get("/tickets.json?page=" + strconv.Itoa(i))
 		if err != nil {
 			return []ticket{}, err
@@ -76,9 +79,7 @@ func (c *Client) getTickets() ([]ticket, error) {
 			return []ticket{}, err
 		}
 
-		for _, t := range tickets.List {
-			list = append(list, t)
-		}
+		list = append(list, tickets.List...)
 
 		if tickets.Next == "" {
 			break
@@ -95,13 +96,21 @@ func (c *Client) getTickets() ([]ticket, error) {
 	return list, nil
 }
 
-//GetTicketStats Return statistics of all tickets in a map
+// GetTicketStats Return statistics of all tickets in a map
 func (c *Client) GetTicketStats() (*ResultTicket, error) {
 	rt := NewResultTicket()
 
 	list, err := c.getTickets()
 	if err != nil {
 		return nil, err
+	}
+
+	// Add debug logging for first ticket
+	if len(list) > 0 {
+		fmt.Printf("DEBUG: First ticket - Priority: %q, Status: %q, Channel: %q\n",
+			list[0].Priority,
+			list[0].Status,
+			list[0].Via.Channel)
 	}
 
 	rt.SetCount(float64(len(list)))

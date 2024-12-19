@@ -7,7 +7,16 @@ import (
 var (
 	listPriority = []string{"urgent", "high", "normal", "low", "undefined"}
 	listStatus   = []string{"new", "open", "pending", "hold", "solved", "closed"}
-	listVia      = []string{"web", "mobile", "rule", "system", "twitter", "email", "chat"}
+	listVia      = []string{
+		"web",
+		"mobile",
+		"rule",
+		"system",
+		"twitter",
+		"email",
+		"chat",
+		"native_messaging", // Add the new channel type
+	}
 )
 
 func getEmptyGlobal() []Global {
@@ -55,13 +64,13 @@ func getEmptyVia() map[string]float64 {
 	return m
 }
 
-//Global Stock result with all label in parameters
+// Global Stock result with all label in parameters
 type Global struct {
 	Labels map[string]string
 	Count  float64
 }
 
-//GetGlobal Return Global of []Global with right labels
+// GetGlobal Return Global of []Global with right labels
 func GetGlobal(gs *[]Global, labels map[string]string) (*Global, int, error) {
 	ok := false
 	for k, g := range *gs {
@@ -81,7 +90,7 @@ func GetGlobal(gs *[]Global, labels map[string]string) (*Global, int, error) {
 	return nil, -1, errors.New("Global not found")
 }
 
-//ResultTicket Stock result
+// ResultTicket Stock result
 type ResultTicket struct {
 	count    float64
 	global   []Global
@@ -90,7 +99,7 @@ type ResultTicket struct {
 	via      map[string]float64
 }
 
-//NewResultTicket Create new ResultTicket
+// NewResultTicket Create new ResultTicket
 func NewResultTicket() *ResultTicket {
 	return &ResultTicket{
 		count:    0,
@@ -101,52 +110,52 @@ func NewResultTicket() *ResultTicket {
 	}
 }
 
-//SetCount Set number of tickets
+// SetCount Set number of tickets
 func (rt *ResultTicket) SetCount(c float64) {
 	rt.count = c
 }
 
-//GetCount Get number of tickets
+// GetCount Get number of tickets
 func (rt *ResultTicket) GetCount() float64 {
 	return rt.count
 }
 
-//SetGlobals Set number of ticket by all filters
+// SetGlobals Set number of ticket by all filters
 func (rt *ResultTicket) SetGlobals(t *[]Global) {
 	rt.global = *t
 }
 
-//GetGlobals Get number of ticket by all filters
+// GetGlobals Get number of ticket by all filters
 func (rt *ResultTicket) GetGlobals() *[]Global {
 	return &rt.global
 }
 
-//SetPriority Set number of ticket by priority
+// SetPriority Set number of ticket by priority
 func (rt *ResultTicket) SetPriority(m map[string]float64) {
 	rt.priority = m
 }
 
-//GetPriority Get number of ticket by status
+// GetPriority Get number of ticket by status
 func (rt *ResultTicket) GetPriority() map[string]float64 {
 	return rt.priority
 }
 
-//SetStatus Set number of ticket by status
+// SetStatus Set number of ticket by status
 func (rt *ResultTicket) SetStatus(m map[string]float64) {
 	rt.status = m
 }
 
-//GetStatus Get number of ticket by status
+// GetStatus Get number of ticket by status
 func (rt *ResultTicket) GetStatus() map[string]float64 {
 	return rt.status
 }
 
-//SetVia Set number of tickets by source type
+// SetVia Set number of tickets by source type
 func (rt *ResultTicket) SetVia(v map[string]float64) {
 	rt.via = v
 }
 
-//GetVia Get number of tickets by source type
+// GetVia Get number of tickets by source type
 func (rt *ResultTicket) GetVia() map[string]float64 {
 	return rt.via
 }

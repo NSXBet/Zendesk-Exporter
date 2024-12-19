@@ -4,7 +4,6 @@ import (
 	"github.com/NSXBet/Zendesk-Exporter/src/config"
 	"github.com/NSXBet/Zendesk-Exporter/src/zendesk"
 
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -18,12 +17,14 @@ func (c collector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c collector) Collect(ch chan<- prometheus.Metric) {
+	logger.Debug().Msg("Starting metrics collection")
 
 	rt, err := c.zenClient.GetTicketStats()
 	if err != nil {
-		level.Error(logger).Log("msg", "Error fetching metrics", "err", err)
+		logger.Error().Err(err).Msg("Error fetching metrics")
 		return
 	}
+	logger.Debug().Interface("stats", rt).Msg("Retrieved ticket stats")
 
 	ch <- prometheus.MustNewConstMetric(
 		prometheus.NewDesc("zendesk_ticket_count", "Tickets Number", nil, nil),
